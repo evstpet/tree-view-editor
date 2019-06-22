@@ -20,7 +20,7 @@ public class CacheTreeStorage {
     }
 
     public void addNew(Node<CachedNode> node, String value) {
-        node.addChild(new CachedNode(value, null, UUID.randomUUID()));
+        node.addChild(new CachedNode(value, (CachedNode) node, null));
     }
 
     public void remove(Node node) {
@@ -33,6 +33,7 @@ public class CacheTreeStorage {
             CachedNode foundNode = found.get();
             foundNode.setEnable(false);
         }
+        cleanVisited();
     }
 
     public void importToChache(Node node) {
@@ -62,6 +63,7 @@ public class CacheTreeStorage {
         if (parentNode != null) {
             CachedNode newNode = new CachedNode(node.getValue(), parentNode, node.getGuid());
             childs.forEach(newNode::addChild);
+            newNode.setEnable(parentNode.isEnable());
             parentNode.addChild(newNode);
         } else {
             CachedNode newNode = new CachedNode(node.getValue(), null, node.getGuid());
@@ -108,7 +110,7 @@ public class CacheTreeStorage {
 
     private Optional<CachedNode> findChild(CachedNode node) {
         return node.getChilds().stream()
-                        .filter(cachedNode -> cachedNode.isEnable() && !cachedNode.isVisited())
+                        .filter(cachedNode -> !cachedNode.isVisited())
                         .findFirst();
     }
 

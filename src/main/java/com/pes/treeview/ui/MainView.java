@@ -3,6 +3,7 @@ package com.pes.treeview.ui;
 import com.pes.treeview.core.domain.Node;
 import com.pes.treeview.core.persistent.CacheTreeStorage;
 import com.pes.treeview.core.persistent.DBTreeStorage;
+import com.pes.treeview.core.service.TreeViewService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.grid.editor.Editor;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -37,10 +38,14 @@ public class MainView extends VerticalLayout {
     private Button removeBtn;
     private Button resetBtn;
     private Button importBtn;
+    private Button exportBtn;
     private TextField editableField;
 
+    private TreeViewService treeViewService;
+
     @Autowired
-    public MainView(DBTreeStorage dbTreeStorage, CacheTreeStorage cacheTreeStorage) {
+    public MainView(DBTreeStorage dbTreeStorage, CacheTreeStorage cacheTreeStorage, TreeViewService treeViewService) {
+        this.treeViewService = treeViewService;
         editableField = new TextField();
         dbTreeGrid = createTreeGrid(singletonList(dbTreeStorage.getTree()));
 
@@ -69,6 +74,8 @@ public class MainView extends VerticalLayout {
     private VerticalLayout createImportBtnBlock(CacheTreeStorage cacheTreeStorage) {
         VerticalLayout baseLayout = new VerticalLayout();
         importBtn = new Button("Import");
+        exportBtn = new Button("Export");
+
         importBtn.addClickListener(event -> {
             if (!dbTreeGrid.getSelectedItems().isEmpty()) {
                 cacheTreeStorage.importToChache(dbTreeGrid.getSelectedItems().iterator().next());
@@ -77,7 +84,12 @@ public class MainView extends VerticalLayout {
                 cachedTreeGrid.expandRecursively(cacheTreeStorage.getCache(), 10);
             }
         });
+        exportBtn.addClickListener(event -> {
+            treeViewService.exportCacheToDb();
+        });
+
         baseLayout.add(importBtn);
+        baseLayout.add(exportBtn);
 
         return baseLayout;
     }
