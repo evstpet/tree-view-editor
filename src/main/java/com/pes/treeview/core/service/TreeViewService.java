@@ -1,6 +1,6 @@
 package com.pes.treeview.core.service;
 
-import com.pes.treeview.core.domain.CachedNode;
+import com.pes.treeview.core.domain.CacheNode;
 import com.pes.treeview.core.domain.DbNode;
 import com.pes.treeview.core.domain.Node;
 import com.pes.treeview.core.persistent.CacheTreeStorage;
@@ -17,24 +17,24 @@ public class TreeViewService {
     private final CacheTreeStorage cacheTreeStorage;
     private final DBTreeStorage dbTreeStorage;
 
-    private List<CachedNode> visitedNodes = new ArrayList<>();
+    private List<CacheNode> visitedNodes = new ArrayList<>();
 
     public void exportCacheToDb() {
         List<Node> cachedNodes = cacheTreeStorage.getCache();
         cachedNodes.forEach(this::traverseCachedTree);
-        cacheTreeStorage.getInternalCache().forEach((key, val) ->
+        cacheTreeStorage.getExternalLinksCache().forEach((key, val) ->
                 System.out.println("Db node: " + val.getValue()));
         cleanVisited();
     }
 
-    public void traverseCachedTree(Node<CachedNode> node) {
-        CachedNode tree = (CachedNode) node;
+    private void traverseCachedTree(Node<CacheNode> node) {
+        CacheNode tree = (CacheNode) node;
 
         if (!tree.isEnable()) {
             System.out.println("===Disable node & childs for: " + tree.getValue() + "===");
         }
 
-        Deque<CachedNode> stack = new LinkedList<>();
+        Deque<CacheNode> stack = new LinkedList<>();
         while (tree != null || !stack.isEmpty()) {
 
             if (!stack.isEmpty()) {
@@ -42,7 +42,7 @@ public class TreeViewService {
             }
 
             while (tree != null) {
-                Optional<CachedNode> child = findChild(tree);
+                Optional<CacheNode> child = tree.findNotVisitedChild();
                 if (child.isPresent()) {
                     stack.push(tree);
                     tree = child.get();
@@ -59,7 +59,7 @@ public class TreeViewService {
                 }
                 if (!tree.isEnable() && tree.isCopied()) {
                     System.out.println("===Disable node & childs for: " + tree.getValue() + "===");
-                    Node disabledNode = cacheTreeStorage.getInternalCache().get(tree.getGuid());
+                    Node disabledNode = cacheTreeStorage.getExternalLinksCache().get(tree.getGuid());
                     disabledNode.setEnable(false);
                 }
                 if (tree.isEnable() && !tree.isCopied()) {
@@ -67,13 +67,13 @@ public class TreeViewService {
                     Node newNodeParent = createParentRecursively(tree.getParent());
                     DbNode newNode = new DbNode(tree.getValue(), (DbNode) newNodeParent, tree.getGuid());
                     newNodeParent.addChild(newNode);
-                    cacheTreeStorage.getInternalCache().putIfAbsent(newNode.getGuid(), newNode);
+                    cacheTreeStorage.getExternalLinksCache().putIfAbsent(newNode.getGuid(), newNode);
                     tree.setCopied(true);
                     tree.setChanged(false);
                 }
                 if (tree.isEnable() && tree.isChanged()) {
                     System.out.println("===Set new value for node: " + tree.getValue() + "===");
-                    Node changedNode = cacheTreeStorage.getInternalCache().get(tree.getGuid());
+                    Node changedNode = cacheTreeStorage.getExternalLinksCache().get(tree.getGuid());
                     changedNode.setValue(tree.getValue());
                     tree.setChanged(false);
                 }
@@ -85,8 +85,8 @@ public class TreeViewService {
         }
     }
 
-    private Node createParentRecursively(CachedNode treeParent) {
-        Node newNodeParent = cacheTreeStorage.getInternalCache().get(treeParent.getGuid());
+    private Node createParentRecursively(CacheNode treeParent) {
+        Node newNodeParent = cacheTreeStorage.getExternalLinksCache().get(treeParent.getGuid());
 
         if (newNodeParent != null) {
             return newNodeParent;
@@ -97,18 +97,11 @@ public class TreeViewService {
 
         DbNode newNode = new DbNode(treeParent.getValue(), (DbNode) newNodeParent, treeParent.getGuid());
         newNodeParent.addChild(newNode);
-        cacheTreeStorage.getInternalCache().putIfAbsent(newNode.getGuid(), newNode);
+        cacheTreeStorage.getExternalLinksCache().putIfAbsent(newNode.getGuid(), newNode);
         treeParent.setCopied(true);
         treeParent.setChanged(false);
 
         return newNode;
-    }
-
-
-    private Optional<CachedNode> findChild(CachedNode node) {
-        return node.getChilds().stream()
-                .filter(cachedNode -> !cachedNode.isVisited())
-                .findFirst();
     }
 
     private void cleanVisited() {

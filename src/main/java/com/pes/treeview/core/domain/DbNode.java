@@ -14,7 +14,6 @@ public class DbNode implements Node<DbNode> {
     private boolean enable;
     private final DbNode parent;
     private final List<DbNode> childs;
-    public boolean visited;
 
     public DbNode(String value, DbNode parent, UUID guid) {
         this.guid = guid;
@@ -37,9 +36,5 @@ public class DbNode implements Node<DbNode> {
             this.enable = enable;
             childs.forEach(node -> node.setEnable(enable));
         }
-    }
-
-    public void setVisited(boolean visited) {
-        this.visited = visited;
     }
 }

@@ -11,7 +11,6 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.treegrid.TreeGrid;
 import com.vaadin.flow.data.binder.Binder;
-import com.vaadin.flow.data.renderer.TemplateRenderer;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.spring.annotation.UIScope;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +19,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 import static com.vaadin.flow.component.grid.Grid.SelectionMode.SINGLE;
-import static com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.CENTER;
 import static java.util.Collections.singletonList;
 
 

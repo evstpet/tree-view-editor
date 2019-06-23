@@ -5,21 +5,21 @@ import lombok.Getter;
 import java.util.*;
 
 @Getter
-public class CachedNode implements Node<CachedNode> {
+public class CacheNode implements Node<CacheNode> {
 
     private final UUID guid;
+    private final CacheNode parent;
+    private final List<CacheNode> childs;
     private String value;
     private boolean enable;
-    private final CachedNode parent;
-    private final List<CachedNode> childs;
     private boolean visited;
     private boolean changed;
     private boolean copied;
 
-    public CachedNode(String value, CachedNode parent, UUID dbNodeGuid) {
-        if (dbNodeGuid != null) {
+    public CacheNode(String value, CacheNode parent, UUID originalGuid) {
+        if (originalGuid != null) {
             copied = true;
-            guid = dbNodeGuid;
+            guid = originalGuid;
         } else {
             guid = UUID.randomUUID();
         }
@@ -29,13 +29,17 @@ public class CachedNode implements Node<CachedNode> {
         this.enable = true;
     }
 
-    public void addChild(CachedNode node) {
+    public void addChild(CacheNode node) {
         boolean nodeIsPresented = childs.stream()
                 .anyMatch(child -> Objects.equals(child.getGuid(), node.guid));
 
         if (!nodeIsPresented) {
             childs.add(node);
         }
+    }
+
+    public List<CacheNode> getChilds() {
+        return new ArrayList<>(childs);
     }
 
     public void setValue(String value) {
@@ -62,14 +66,10 @@ public class CachedNode implements Node<CachedNode> {
         this.copied = copied;
     }
 
-
-    @Override
-    public String toString() {
-        return "CachedNode{" +
-                "value='" + value + '\'' +
-                ", enable=" + enable +
-                ", changed=" + changed +
-                ", copied=" + copied +
-                '}';
+    public Optional<CacheNode> findNotVisitedChild() {
+        return getChilds()
+                .stream()
+                .filter(cacheNode -> !cacheNode.isVisited())
+                .findFirst();
     }
 }
