@@ -1,9 +1,7 @@
 package com.pes.treeview.ui;
 
 import com.pes.treeview.core.domain.Node;
-import com.pes.treeview.core.persistent.CacheTreeStorage;
-import com.pes.treeview.core.persistent.DBTreeStorage;
-import com.pes.treeview.core.service.TreeViewService;
+import com.pes.treeview.core.service.TreeViewFacade;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.grid.editor.Editor;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -19,7 +17,6 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 import static com.vaadin.flow.component.grid.Grid.SelectionMode.SINGLE;
-import static java.util.Collections.singletonList;
 
 
 @Route
@@ -39,24 +36,24 @@ public class MainView extends VerticalLayout {
     private Button exportBtn;
     private TextField editableField;
 
-    private TreeViewService treeViewService;
+    private TreeViewFacade treeViewFacade;
 
     @Autowired
-    public MainView(DBTreeStorage dbTreeStorage, CacheTreeStorage cacheTreeStorage, TreeViewService treeViewService) {
-        this.treeViewService = treeViewService;
+    public MainView(TreeViewFacade treeViewFacade) {
+        this.treeViewFacade = treeViewFacade;
         editableField = new TextField();
-        dbTreeGrid = createTreeGrid(singletonList(dbTreeStorage.getTree()));
+        dbTreeGrid = createTreeGrid(treeViewFacade.getDbTree());
 
         HorizontalLayout baseLayout = new HorizontalLayout();
-        baseLayout.add(createCacheTreeBlock(cacheTreeStorage, dbTreeStorage));
-        baseLayout.add(createImportBtnBlock(cacheTreeStorage, dbTreeStorage));
+        baseLayout.add(createCacheTreeBlock());
+        baseLayout.add(createImportBtnBlock());
         baseLayout.add(createDbTreeBlock());
         add(baseLayout);
     }
 
-    private VerticalLayout createCacheTreeBlock(CacheTreeStorage cacheTreeStorage, DBTreeStorage dbTreeStorage) {
+    private VerticalLayout createCacheTreeBlock() {
         VerticalLayout baseLayout = new VerticalLayout();
-        cachedTreeGrid = createTreeGrid(cacheTreeStorage.getCache());
+        cachedTreeGrid = createTreeGrid(treeViewFacade.getCacheTree());
         Binder<Node> binder = new Binder<>(Node.class);
         Editor<Node> editor = cachedTreeGrid.getEditor();
         editor.setBinder(binder);
@@ -64,32 +61,26 @@ public class MainView extends VerticalLayout {
         binder.forField(editableField).bind("value");
         cachedTreeGrid.getColumns().get(0).setEditorComponent(editableField);
         baseLayout.add(cachedTreeGrid);
-        baseLayout.add(createCacheBtnsBlock(cacheTreeStorage, dbTreeStorage));
+        baseLayout.add(createCacheBtnsBlock());
 
         return baseLayout;
     }
 
-    private VerticalLayout createImportBtnBlock(CacheTreeStorage cacheTreeStorage, DBTreeStorage dbTreeStorage) {
+    private VerticalLayout createImportBtnBlock() {
         VerticalLayout baseLayout = new VerticalLayout();
         importBtn = new Button("Import");
         exportBtn = new Button("Export");
 
         importBtn.addClickListener(event -> {
             if (!dbTreeGrid.getSelectedItems().isEmpty()) {
-                cacheTreeStorage.importToChache(dbTreeGrid.getSelectedItems().iterator().next());
-                cachedTreeGrid.setItems(cacheTreeStorage.getCache(), Node::getChilds);
-                cachedTreeGrid.getDataProvider().refreshAll();
-                cachedTreeGrid.expandRecursively(cacheTreeStorage.getCache(), 10);
+                treeViewFacade.importToChache(dbTreeGrid.getSelectedItems().iterator().next());
+                refreshCacheTreeGrid();
             }
         });
         exportBtn.addClickListener(event -> {
-            treeViewService.exportCacheToDb();
-            dbTreeGrid.setItems(singletonList(dbTreeStorage.getTree()), Node::getChilds);
-            dbTreeGrid.getDataProvider().refreshAll();
-            dbTreeGrid.expandRecursively(singletonList(dbTreeStorage.getTree()), 10);
-            cachedTreeGrid.setItems(cacheTreeStorage.getCache(), Node::getChilds);
-            cachedTreeGrid.getDataProvider().refreshAll();
-            cachedTreeGrid.expandRecursively(cacheTreeStorage.getCache(), 10);
+            treeViewFacade.exportCacheToDb();
+            refreshDbTreeGrid();
+            refreshCacheTreeGrid();
         });
 
         baseLayout.add(importBtn);
@@ -102,26 +93,13 @@ public class MainView extends VerticalLayout {
         return new VerticalLayout(dbTreeGrid);
     }
 
-    private HorizontalLayout createCacheBtnsBlock(CacheTreeStorage cacheTreeStorage, DBTreeStorage dbTreeStorage) {
+    private HorizontalLayout createCacheBtnsBlock() {
         HorizontalLayout baseLayout = new HorizontalLayout();
+        Editor<Node> editor = cachedTreeGrid.getEditor();
 
         saveBtn = new Button("Save");
         saveBtn.addClassName("save");
         saveBtn.setEnabled(false);
-
-        cancelBtn = new Button("Cancel");
-        cancelBtn.setEnabled(false);
-        cancelBtn.addClassName("cancel");
-
-        editBtn = new Button("Edit");
-        editBtn.addClassName("edit");
-
-        addBtn = new Button("+");
-        removeBtn = new Button("-");
-        resetBtn = new Button("Reset");
-
-        Editor<Node> editor = cachedTreeGrid.getEditor();
-
         saveBtn.addClickListener(e -> {
             if (!editBtn.isEnabled()) {
                 editor.save();
@@ -130,6 +108,11 @@ public class MainView extends VerticalLayout {
                 editBtn.setEnabled(true);
             }
         });
+        baseLayout.add(saveBtn);
+
+        cancelBtn = new Button("Cancel");
+        cancelBtn.setEnabled(false);
+        cancelBtn.addClassName("cancel");
         cancelBtn.addClickListener(e -> {
             if (!editBtn.isEnabled()) {
                 editor.cancel();
@@ -138,6 +121,10 @@ public class MainView extends VerticalLayout {
                 editBtn.setEnabled(true);
             }
         });
+        baseLayout.add(cancelBtn);
+
+        editBtn = new Button("Edit");
+        editBtn.addClassName("edit");
         editBtn.addClickListener(e -> {
             if (!cachedTreeGrid.getSelectedItems().isEmpty()) {
                 Node node = cachedTreeGrid.getSelectedItems().iterator().next();
@@ -150,43 +137,38 @@ public class MainView extends VerticalLayout {
                 }
             }
         });
+        baseLayout.add(editBtn);
+
+        addBtn = new Button("+");
         addBtn.addClickListener(e -> {
             if (!cachedTreeGrid.getSelectedItems().isEmpty()) {
                 Node node = cachedTreeGrid.getSelectedItems().iterator().next();
                 if (node.isEnable()) {
-                    cacheTreeStorage.addNew(node, "New node");
-                    cachedTreeGrid.setItems(cacheTreeStorage.getCache(), Node::getChilds);
-                    cachedTreeGrid.getDataProvider().refreshAll();
-                    cachedTreeGrid.expandRecursively(cacheTreeStorage.getCache(), 10);
+                    treeViewFacade.addNewToCache(node, "New node");
+                    refreshCacheTreeGrid();
                 }
             }
         });
+        baseLayout.add(addBtn);
+
+        removeBtn = new Button("-");
         removeBtn.addClickListener(e -> {
             if (!cachedTreeGrid.getSelectedItems().isEmpty()) {
                 Node node = cachedTreeGrid.getSelectedItems().iterator().next();
                 if (node.isEnable()) {
-                    cacheTreeStorage.remove(node);
-                    cachedTreeGrid.setItems(cacheTreeStorage.getCache(), Node::getChilds);
-                    cachedTreeGrid.getDataProvider().refreshAll();
-                    cachedTreeGrid.expandRecursively(cacheTreeStorage.getCache(), 10);
+                    treeViewFacade.remove(node);
+                    refreshCacheTreeGrid();
                 }
             }
         });
-        resetBtn.addClickListener(e -> {
-            cacheTreeStorage.reset();
-            cachedTreeGrid.setItems(cacheTreeStorage.getCache(), Node::getChilds);
-            dbTreeStorage.reset();
-            dbTreeGrid.setItems(singletonList(dbTreeStorage.getTree()), Node::getChilds);
-            dbTreeGrid.expandRecursively(singletonList(dbTreeStorage.getTree()), 10);
-            cachedTreeGrid.getDataProvider().refreshAll();
-            dbTreeGrid.getDataProvider().refreshAll();
-        });
-
-        baseLayout.add(saveBtn);
-        baseLayout.add(cancelBtn);
-        baseLayout.add(editBtn);
-        baseLayout.add(addBtn);
         baseLayout.add(removeBtn);
+
+        resetBtn = new Button("Reset");
+        resetBtn.addClickListener(e -> {
+            treeViewFacade.reset();
+            refreshCacheTreeGrid();
+            refreshDbTreeGrid();
+        });
         baseLayout.add(resetBtn);
 
         return baseLayout;
@@ -213,5 +195,17 @@ public class MainView extends VerticalLayout {
         }
 
         return value;
+    }
+
+    private void refreshCacheTreeGrid() {
+        cachedTreeGrid.setItems(treeViewFacade.getCacheTree(), Node::getChilds);
+        cachedTreeGrid.getDataProvider().refreshAll();
+        cachedTreeGrid.expandRecursively(treeViewFacade.getCacheTree(), 10);
+    }
+
+    private void refreshDbTreeGrid() {
+        dbTreeGrid.setItems(treeViewFacade.getDbTree(), Node::getChilds);
+        dbTreeGrid.expandRecursively(treeViewFacade.getDbTree(), 10);
+        dbTreeGrid.getDataProvider().refreshAll();
     }
 }

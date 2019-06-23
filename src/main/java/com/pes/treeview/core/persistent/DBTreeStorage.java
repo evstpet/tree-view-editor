@@ -1,7 +1,6 @@
 package com.pes.treeview.core.persistent;
 
 import com.pes.treeview.core.domain.DbNode;
-import com.pes.treeview.core.domain.Node;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -15,7 +14,7 @@ public class DBTreeStorage {
         reset();
     }
 
-    public Node getTree() {
+    public DbNode getTree() {
         return tree;
     }
 

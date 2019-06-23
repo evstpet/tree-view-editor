@@ -6,29 +6,60 @@ import com.pes.treeview.core.domain.Node;
 import com.pes.treeview.core.persistent.CacheTreeStorage;
 import com.pes.treeview.core.persistent.DBTreeStorage;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+import static java.util.Collections.singletonList;
+
 @RequiredArgsConstructor
+@Slf4j
 @Service
-public class TreeViewService {
+public class TreeViewFacade {
 
     private final CacheTreeStorage cacheTreeStorage;
     private final DBTreeStorage dbTreeStorage;
 
     private List<CacheNode> visitedNodes = new ArrayList<>();
 
+    public List<Node> getCacheTree(){
+        return new ArrayList<>(cacheTreeStorage.getCache());
+    }
+
+    public List<Node> getDbTree(){
+        return singletonList(dbTreeStorage.getTree());
+    }
+
+    public void reset() {
+        cacheTreeStorage.reset();
+        dbTreeStorage.reset();
+    }
+
+    public void importToChache(Node externalNode) {
+        log.info("Import to cache: " + externalNode.getValue());
+        cacheTreeStorage.importToChache(externalNode);
+    }
+
+    public void addNewToCache(Node node, String value) {
+        log.info("Import to cache: " + value);
+        cacheTreeStorage.findNodeInCacheTrees(node)
+                .ifPresent(cacheNode -> cacheTreeStorage.addNewToCache(cacheNode, value));
+    }
+
+    public void remove(Node node) {
+        log.info("Mark as removed: " + node.getValue());
+        cacheTreeStorage.remove(node);
+    }
+
     public void exportCacheToDb() {
-        List<Node> cachedNodes = cacheTreeStorage.getCache();
+        log.info("Push cache to db!");
+        List<CacheNode> cachedNodes = cacheTreeStorage.getCache();
         cachedNodes.forEach(this::traverseCachedTree);
-        cacheTreeStorage.getExternalLinksCache().forEach((key, val) ->
-                System.out.println("Db node: " + val.getValue()));
         cleanVisited();
     }
 
-    private void traverseCachedTree(Node<CacheNode> node) {
-        CacheNode tree = (CacheNode) node;
+    private void traverseCachedTree(CacheNode tree) {
 
         if (!tree.isEnable()) {
             System.out.println("===Disable node & childs for: " + tree.getValue() + "===");
@@ -53,17 +84,11 @@ public class TreeViewService {
 
                 tree.setVisited(true);
 
-                //action
-                if (!tree.isEnable() && !tree.isCopied()) {
-                    System.out.println("===Do nothing for: " + tree.getValue() + "===");
-                }
                 if (!tree.isEnable() && tree.isCopied()) {
-                    System.out.println("===Disable node & childs for: " + tree.getValue() + "===");
                     Node disabledNode = cacheTreeStorage.getExternalLinksCache().get(tree.getGuid());
                     disabledNode.setEnable(false);
                 }
                 if (tree.isEnable() && !tree.isCopied()) {
-                    System.out.println("===Add new node & childs for: " + tree.getValue() + "===");
                     Node newNodeParent = createParentRecursively(tree.getParent());
                     DbNode newNode = new DbNode(tree.getValue(), (DbNode) newNodeParent, tree.getGuid());
                     newNodeParent.addChild(newNode);
@@ -72,7 +97,6 @@ public class TreeViewService {
                     tree.setChanged(false);
                 }
                 if (tree.isEnable() && tree.isChanged()) {
-                    System.out.println("===Set new value for node: " + tree.getValue() + "===");
                     Node changedNode = cacheTreeStorage.getExternalLinksCache().get(tree.getGuid());
                     changedNode.setValue(tree.getValue());
                     tree.setChanged(false);
