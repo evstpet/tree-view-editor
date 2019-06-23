@@ -13,14 +13,20 @@ import static java.util.stream.Collectors.toList;
 public class CacheTreeStorage {
 
     private List<CachedNode> cache;
+    private Map<UUID, Node> internalCache;
     private List<CachedNode> visitedNodes = new ArrayList<>();
 
     public CacheTreeStorage() {
         this.cache = new ArrayList<>();
+        this.internalCache = new HashMap<>();
     }
 
     public void addNew(Node<CachedNode> node, String value) {
         node.addChild(new CachedNode(value, (CachedNode) node, null));
+    }
+
+    public void removeChildFromCache(Node node) {
+        node.getParent().getChilds().remove(node);
     }
 
     public void remove(Node node) {
@@ -40,6 +46,8 @@ public class CacheTreeStorage {
         if (cache.stream().anyMatch(cachedNode -> Objects.equals(cachedNode.getGuid(), node.getGuid()))) {
             return;
         }
+
+        internalCache.putIfAbsent(node.getGuid(), node);
 
         CachedNode parentNode = null;
 
@@ -121,9 +129,14 @@ public class CacheTreeStorage {
 
     public void reset(){
         cache = new ArrayList<>();
+        internalCache = new HashMap<>();
     }
 
     public List<Node> getCache(){
         return new ArrayList<>(cache);
+    }
+
+    public Map<UUID, Node> getInternalCache() {
+        return internalCache;
     }
 }

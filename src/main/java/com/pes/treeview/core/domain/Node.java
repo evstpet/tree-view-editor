@@ -20,5 +20,7 @@ public interface Node<T extends Node> {
 
     boolean isEnable();
 
+    void setEnable(boolean enable);
+
     boolean isVisited();
 }

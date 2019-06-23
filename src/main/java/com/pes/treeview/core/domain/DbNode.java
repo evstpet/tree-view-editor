@@ -16,8 +16,8 @@ public class DbNode implements Node<DbNode> {
     private final List<DbNode> childs;
     public boolean visited;
 
-    public DbNode(String value, DbNode parent) {
-        guid = UUID.randomUUID();
+    public DbNode(String value, DbNode parent, UUID guid) {
+        this.guid = guid;
         childs = new ArrayList<>();
         this.value = value;
         this.parent = parent;

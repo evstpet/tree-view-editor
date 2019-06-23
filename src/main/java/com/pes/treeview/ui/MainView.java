@@ -51,7 +51,7 @@ public class MainView extends VerticalLayout {
 
         HorizontalLayout baseLayout = new HorizontalLayout();
         baseLayout.add(createCacheTreeBlock(cacheTreeStorage, dbTreeStorage));
-        baseLayout.add(createImportBtnBlock(cacheTreeStorage));
+        baseLayout.add(createImportBtnBlock(cacheTreeStorage, dbTreeStorage));
         baseLayout.add(createDbTreeBlock());
         add(baseLayout);
     }
@@ -71,7 +71,7 @@ public class MainView extends VerticalLayout {
         return baseLayout;
     }
 
-    private VerticalLayout createImportBtnBlock(CacheTreeStorage cacheTreeStorage) {
+    private VerticalLayout createImportBtnBlock(CacheTreeStorage cacheTreeStorage, DBTreeStorage dbTreeStorage) {
         VerticalLayout baseLayout = new VerticalLayout();
         importBtn = new Button("Import");
         exportBtn = new Button("Export");
@@ -86,6 +86,12 @@ public class MainView extends VerticalLayout {
         });
         exportBtn.addClickListener(event -> {
             treeViewService.exportCacheToDb();
+            dbTreeGrid.setItems(singletonList(dbTreeStorage.getTree()), Node::getChilds);
+            dbTreeGrid.getDataProvider().refreshAll();
+            dbTreeGrid.expandRecursively(singletonList(dbTreeStorage.getTree()), 10);
+            cachedTreeGrid.setItems(cacheTreeStorage.getCache(), Node::getChilds);
+            cachedTreeGrid.getDataProvider().refreshAll();
+            cachedTreeGrid.expandRecursively(cacheTreeStorage.getCache(), 10);
         });
 
         baseLayout.add(importBtn);

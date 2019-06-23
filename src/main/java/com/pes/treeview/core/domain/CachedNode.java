@@ -46,13 +46,20 @@ public class CachedNode implements Node<CachedNode> {
     public void setEnable(boolean enable) {
         if (this.enable) {
             this.enable = enable;
-            this.changed = true;
             childs.forEach(node -> node.setEnable(enable));
         }
     }
 
+    public void setChanged(boolean changed) {
+        this.changed = changed;
+    }
+
     public void setVisited(boolean visited) {
         this.visited = visited;
+    }
+
+    public void setCopied(boolean copied) {
+        this.copied = copied;
     }
 
 
