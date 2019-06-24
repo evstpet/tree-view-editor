@@ -156,7 +156,7 @@ public class MainView extends VerticalLayout {
             if (!cachedTreeGrid.getSelectedItems().isEmpty()) {
                 Node node = cachedTreeGrid.getSelectedItems().iterator().next();
                 if (node.isEnable()) {
-                    treeViewFacade.remove(node);
+                    treeViewFacade.disableInCache(node);
                     refreshCacheTreeGrid();
                 }
             }

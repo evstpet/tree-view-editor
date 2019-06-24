@@ -14,12 +14,12 @@ import static java.util.stream.Collectors.toList;
 public class CacheTreeStorage {
 
     private List<CacheNode> cache;
-    private Map<UUID, Node> cachedExternalNodes;
+//    private Map<UUID, Node> cachedExternalNodes;
     private List<CacheNode> visitedNodes = new ArrayList<>();
 
     public CacheTreeStorage() {
         this.cache = new ArrayList<>();
-        this.cachedExternalNodes = new HashMap<>();
+//        this.cachedExternalNodes = new HashMap<>();
     }
 
     public void addNewToCache(CacheNode node, String value) {
@@ -35,10 +35,10 @@ public class CacheTreeStorage {
     }
 
     public void importToChache(Node externalNode) {
-        if (cachedExternalNodes.get(externalNode.getGuid()) != null) {
-            return;
-        }
-        cachedExternalNodes.put(externalNode.getGuid(), externalNode);
+//        if (cachedExternalNodes.get(externalNode.getGuid()) != null) {
+//            return;
+//        }
+//        cachedExternalNodes.put(externalNode.getGuid(), externalNode);
 
         CacheNode parentNode = findNodeInCacheTrees(externalNode.getParent()).orElse(null);
         List<CacheNode> childs = getChildsFromCache(externalNode);
@@ -137,14 +137,14 @@ public class CacheTreeStorage {
 
     public void reset() {
         cache = new ArrayList<>();
-        cachedExternalNodes = new HashMap<>();
+//        cachedExternalNodes = new HashMap<>();
     }
 
     public List<CacheNode> getCache() {
         return cache;
     }
 
-    public Map<UUID, Node> getCachedExternalNodes() {
-        return cachedExternalNodes;
-    }
+//    public Map<UUID, Node> getCachedExternalNodes() {
+////        return cachedExternalNodes;
+//    }
 }

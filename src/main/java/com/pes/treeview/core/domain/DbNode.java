@@ -10,10 +10,11 @@ import java.util.UUID;
 public class DbNode implements Node<DbNode> {
 
     private final UUID guid;
-    private String value;
-    private boolean enable;
     private final DbNode parent;
     private final List<DbNode> childs;
+    private String value;
+    private boolean enable;
+    private boolean visited;
 
     public DbNode(String value, DbNode parent, UUID guid) {
         this.guid = guid;
@@ -29,6 +30,10 @@ public class DbNode implements Node<DbNode> {
 
     public void setValue(String value) {
         this.value = value;
+    }
+
+    public void setVisited(boolean visited) {
+        this.visited = visited;
     }
 
     public void setEnable(boolean enable) {

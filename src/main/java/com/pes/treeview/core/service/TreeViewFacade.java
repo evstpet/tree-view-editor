@@ -22,11 +22,13 @@ public class TreeViewFacade {
     private final CacheTreeStorage cacheTreeStorage;
     private final DBTreeStorage dbTreeStorage;
 
-    public List<Node> getCacheTree(){
+    private List<Node> visitedNodes = new ArrayList<>();
+
+    public List<Node> getCacheTree() {
         return new ArrayList<>(cacheTreeStorage.getCache());
     }
 
-    public List<Node> getDbTree(){
+    public List<Node> getDbTree() {
         return singletonList(dbTreeStorage.getTree());
     }
 
@@ -37,7 +39,9 @@ public class TreeViewFacade {
 
     public void importToChache(Node externalNode) {
         log.info("Import to cache: " + externalNode.getValue());
-        cacheTreeStorage.importToChache(externalNode);
+        if (!cacheTreeStorage.findNodeInCacheTrees(externalNode).isPresent()) {
+            cacheTreeStorage.importToChache(externalNode);
+        }
     }
 
     public void addNewToCache(Node node, String value) {
@@ -46,7 +50,7 @@ public class TreeViewFacade {
                 .ifPresent(cacheNode -> cacheTreeStorage.addNewToCache(cacheNode, value));
     }
 
-    public void remove(Node node) {
+    public void disableInCache(Node node) {
         log.info("Mark as removed: " + node.getValue());
         cacheTreeStorage.disableLeaf(node);
     }
@@ -61,46 +65,103 @@ public class TreeViewFacade {
         return node -> {
 
             if (!node.isEnable() && node.isCopied()) {
-                Node disabledNode = cacheTreeStorage.getCachedExternalNodes().get(node.getGuid());
-                disabledNode.setEnable(false);
+                disableDbNode(node);
             }
 
             if (node.isEnable() && !node.isCopied()) {
-                DbNode newNodeParent = createDbParentRecursively(node.getParent());
-                DbNode newNode = new DbNode(node.getValue(), newNodeParent, node.getGuid());
-                newNodeParent.addChild(newNode);
-                cacheTreeStorage.getCachedExternalNodes().putIfAbsent(newNode.getGuid(), newNode);
-                node.setCopied(true);
-                node.setChanged(false);
+                addNewDbNode(node);
             }
 
             if (node.isEnable() && node.isChanged()) {
-                Node changedNode = cacheTreeStorage.getCachedExternalNodes().get(node.getGuid());
-                changedNode.setValue(node.getValue());
-                node.setChanged(false);
+                changeValueForDbNode(node);
             }
 
             return null;
         };
     }
 
-    private DbNode createDbParentRecursively(CacheNode treeParent) {
-        DbNode newNodeParent = (DbNode) cacheTreeStorage.getCachedExternalNodes().get(treeParent.getGuid());
 
-        if (newNodeParent != null) {
-            return newNodeParent;
+
+    private void disableDbNode(Node node) {
+        findDbNode(node).ifPresent(dbNode -> dbNode.setEnable(false));
+    }
+
+    private void addNewDbNode(CacheNode node) {
+        DbNode newNodeParent = createDbParentRecursively(node.getParent());
+        DbNode newNode = new DbNode(node.getValue(), newNodeParent, node.getGuid());
+        newNodeParent.addChild(newNode);
+        node.setCopied(true);
+        node.setChanged(false);
+    }
+
+    private void changeValueForDbNode(CacheNode node) {
+        findDbNode(node).ifPresent(dbNode -> dbNode.setValue(node.getValue()));
+        node.setChanged(false);
+    }
+
+    private DbNode createDbParentRecursively(CacheNode treeParent) {
+        Optional<DbNode> newNodeParent = findDbNode(treeParent);
+
+        if (newNodeParent.isPresent()) {
+            return newNodeParent.get();
         }
 
-        newNodeParent = createDbParentRecursively(treeParent.getParent());
+        DbNode parent = createDbParentRecursively(treeParent.getParent());
 
-
-        DbNode newNode = new DbNode(treeParent.getValue(), newNodeParent, treeParent.getGuid());
-        newNodeParent.addChild(newNode);
-        cacheTreeStorage.getCachedExternalNodes().putIfAbsent(newNode.getGuid(), newNode);
+        DbNode newNode = new DbNode(treeParent.getValue(), parent, treeParent.getGuid());
+        parent.addChild(newNode);
         treeParent.setCopied(true);
         treeParent.setChanged(false);
-
         return newNode;
     }
 
+    private Optional<DbNode> findDbNode(Node node) {
+        return Optional.ofNullable(traverseTree(dbTreeStorage.getTree(),
+                     currentNode -> {
+                         if (Objects.equals(currentNode.getGuid(), node.getGuid())) {
+                             return currentNode;
+                         }
+                         return null;
+                     }));
+    }
+
+    private <T extends Node<T>> T traverseTree(T tree, Function<T, T> action) {
+        T result = null;
+
+        Deque<T> stack = new LinkedList<>();
+        while (tree != null || !stack.isEmpty()) {
+
+            if (!stack.isEmpty()) {
+                tree = stack.pop();
+            }
+
+            while (tree != null) {
+                Optional<T> child = tree.findNotVisitedChild();
+                if (child.isPresent()) {
+                    stack.push(tree);
+                    tree = child.get();
+                    continue;
+                }
+
+                result = action.apply(tree);
+
+                if (result != null) {
+                    cleanVisited();
+                    return result;
+                }
+
+                tree.setVisited(true);
+                visitedNodes.add(tree);
+                tree = null;
+            }
+        }
+
+        cleanVisited();
+        return result;
+    }
+
+    private void cleanVisited() {
+        visitedNodes.forEach(node -> node.setVisited(false));
+        visitedNodes = new ArrayList<>();
+    }
 }

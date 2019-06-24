@@ -65,11 +65,4 @@ public class CacheNode implements Node<CacheNode> {
     public void setCopied(boolean copied) {
         this.copied = copied;
     }
-
-    public Optional<CacheNode> findNotVisitedChild() {
-        return getChilds()
-                .stream()
-                .filter(cacheNode -> !cacheNode.isVisited())
-                .findFirst();
-    }
 }
