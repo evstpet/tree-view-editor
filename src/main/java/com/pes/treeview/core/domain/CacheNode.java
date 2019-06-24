@@ -5,24 +5,26 @@ import lombok.Getter;
 import java.util.*;
 
 @Getter
-public class CachedNode implements Node<CachedNode> {
+public class CacheNode implements Node<CacheNode> {
 
     private final UUID guid;
+    private final CacheNode parent;
+    private final List<CacheNode> childs;
     private String value;
     private boolean enable;
-    private final CachedNode parent;
-    private final List<CachedNode> childs;
     private boolean visited;
+    private boolean changed;
+    private boolean copied;
 
-    public CachedNode(String value, CachedNode parent, UUID dbNodeGuid) {
-        guid = dbNodeGuid;
+    CacheNode(String value, CacheNode parent, UUID originalGuid) {
+        guid = originalGuid;
         childs = new ArrayList<>();
         this.value = value;
         this.parent = parent;
         this.enable = true;
     }
 
-    public void addChild(CachedNode node) {
+    public void addChild(CacheNode node) {
         boolean nodeIsPresented = childs.stream()
                 .anyMatch(child -> Objects.equals(child.getGuid(), node.guid));
 
@@ -31,8 +33,13 @@ public class CachedNode implements Node<CachedNode> {
         }
     }
 
+    public List<CacheNode> getChilds() {
+        return new ArrayList<>(childs);
+    }
+
     public void setValue(String value) {
         this.value = value;
+        this.changed = true;
     }
 
     public void setEnable(boolean enable) {
@@ -42,8 +49,15 @@ public class CachedNode implements Node<CachedNode> {
         }
     }
 
+    public void setChanged(boolean changed) {
+        this.changed = changed;
+    }
+
     public void setVisited(boolean visited) {
         this.visited = visited;
     }
 
+    public void setCopied(boolean copied) {
+        this.copied = copied;
+    }
 }

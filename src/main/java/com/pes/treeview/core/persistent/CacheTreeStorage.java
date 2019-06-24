@@ -1,75 +1,49 @@
 package com.pes.treeview.core.persistent;
 
-import com.pes.treeview.core.domain.CachedNode;
-import com.pes.treeview.core.domain.DbNode;
+import com.pes.treeview.core.domain.CacheNode;
 import com.pes.treeview.core.domain.Node;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
+import static com.pes.treeview.core.domain.Nodes.newCacheNodeFromExisted;
 import static java.util.stream.Collectors.toList;
 
 @Component
 public class CacheTreeStorage {
 
-    private List<CachedNode> cache;
-    private List<CachedNode> visitedNodes = new ArrayList<>();
+    private List<CacheNode> cache;
 
     public CacheTreeStorage() {
         this.cache = new ArrayList<>();
     }
 
-    public void addNew(Node<CachedNode> node, String value) {
-        node.addChild(new CachedNode(value, null, UUID.randomUUID()));
-    }
+    public void importToChache(Node externalNode, CacheNode parent, List<CacheNode> childs) {
+        CacheNode newCacheNode = newCacheNodeFromExisted(
+                externalNode.getValue(),
+                externalNode.getGuid(),
+                childs,
+                parent
+        );
 
-    public void remove(Node node) {
-        Optional<CachedNode> found = cache.stream()
-                .map(cachedNode -> findParent(cachedNode, node.getGuid()))
-                .filter(Objects::nonNull)
-                .findAny();
-
-        if (found.isPresent()) {
-            CachedNode foundNode = found.get();
-            foundNode.setEnable(false);
-        }
-    }
-
-    public void importToChache(Node node) {
-        if (cache.stream().anyMatch(cachedNode -> Objects.equals(cachedNode.getGuid(), node.getGuid()))) {
-            return;
-        }
-
-        CachedNode parentNode = null;
-
-        if (node.getParent() != null) {
-            Optional<CachedNode> parent = cache.stream()
-                    .map(cachedNode -> findParent(cachedNode, node.getParent().getGuid()))
-                    .filter(Objects::nonNull)
-                    .findAny();
-
-            if (parent.isPresent()) {
-                parentNode = parent.get();
-            }
-        }
-
-        List<CachedNode> childs = cache.stream()
-                .filter(child -> findChildsGuids(node).contains(child.getGuid()))
-                .collect(toList());
-
-        cache.removeIf(cachedNode -> findChildsGuids(node).contains(cachedNode.getGuid()));
-
-        if (parentNode != null) {
-            CachedNode newNode = new CachedNode(node.getValue(), parentNode, node.getGuid());
-            childs.forEach(newNode::addChild);
-            parentNode.addChild(newNode);
+        if (parent != null) {
+            parent.addChild(newCacheNode);
+            newCacheNode.setEnable(parent.isEnable());
         } else {
-            CachedNode newNode = new CachedNode(node.getValue(), null, node.getGuid());
-            childs.forEach(newNode::addChild);
-            cache.add(newNode);
+            cache.add(newCacheNode);
         }
+    }
 
-        cleanVisited();
+    public void removeChildsFromCache(Node externalNode) {
+        cache.removeIf(cacheNode -> findChildsGuids(externalNode).contains(cacheNode.getGuid()));
+    }
+
+    public List<CacheNode> getChildsFromCache(Node externalNode) {
+        return cache.stream()
+                .filter(cacheNode -> findChildsGuids(externalNode).contains(cacheNode.getGuid()))
+                .collect(toList());
     }
 
     private List<UUID> findChildsGuids(Node<?> node) {
@@ -78,50 +52,11 @@ public class CacheTreeStorage {
                 .collect(toList());
     }
 
-    private CachedNode findParent(CachedNode tree, UUID parentGuid) {
-        Deque<CachedNode> stack = new LinkedList<>();
-        while (tree != null || !stack.isEmpty()) {
-
-            if (!stack.isEmpty()) {
-                tree = stack.pop();
-            }
-
-            while (tree != null) {
-                Optional<CachedNode> child = findChild(tree);
-                if (child.isPresent()) {
-                    stack.push(tree);
-                    tree = child.get();
-                    continue;
-                }
-
-                if (parentGuid.equals(tree.getGuid())) {
-                    return tree;
-                }
-                tree.setVisited(true);
-                visitedNodes.add(tree);
-                tree = null;
-            }
-        }
-
-        return null;
-    }
-
-    private Optional<CachedNode> findChild(CachedNode node) {
-        return node.getChilds().stream()
-                        .filter(cachedNode -> cachedNode.isEnable() && !cachedNode.isVisited())
-                        .findFirst();
-    }
-
-    private void cleanVisited() {
-        visitedNodes.forEach(node -> node.setVisited(false));
-        visitedNodes = new ArrayList<>();
-    }
-
-    public void reset(){
+    public void reset() {
         cache = new ArrayList<>();
     }
 
-    public List<Node> getCache(){
-        return new ArrayList<>(cache);
+    public List<CacheNode> getCache() {
+        return cache;
     }
 }

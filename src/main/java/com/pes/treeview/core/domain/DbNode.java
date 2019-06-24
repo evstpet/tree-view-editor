@@ -10,14 +10,14 @@ import java.util.UUID;
 public class DbNode implements Node<DbNode> {
 
     private final UUID guid;
-    private String value;
-    private boolean enable;
     private final DbNode parent;
     private final List<DbNode> childs;
-    public boolean visited;
+    private String value;
+    private boolean enable;
+    private boolean visited;
 
-    public DbNode(String value, DbNode parent) {
-        guid = UUID.randomUUID();
+    DbNode(String value, DbNode parent, UUID guid) {
+        this.guid = guid;
         childs = new ArrayList<>();
         this.value = value;
         this.parent = parent;
@@ -32,14 +32,14 @@ public class DbNode implements Node<DbNode> {
         this.value = value;
     }
 
+    public void setVisited(boolean visited) {
+        this.visited = visited;
+    }
+
     public void setEnable(boolean enable) {
         if (this.enable) {
             this.enable = enable;
             childs.forEach(node -> node.setEnable(enable));
         }
-    }
-
-    public void setVisited(boolean visited) {
-        this.visited = visited;
     }
 }
