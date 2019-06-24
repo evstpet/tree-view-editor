@@ -112,10 +112,12 @@ public class TreeViewFacade {
                 continue;
             }
 
-            if (!dbNode.isEnable()) {
-                log.warn("Can't export: " + node.getValue() + ", because ancestor in db: " + dbNode.getValue() + " is disabled");
-                return false;
+            if (dbNode.isEnable()) {
+                return true;
             }
+
+            log.warn("Can't export: " + node.getValue() + ", because ancestor in db: " + dbNode.getValue() + " is disabled");
+            return false;
         }
 
         return true;
