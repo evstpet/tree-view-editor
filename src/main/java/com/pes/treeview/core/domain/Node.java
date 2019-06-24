@@ -4,7 +4,7 @@ import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface Node<T extends Node> {
+public interface Node<T extends Node> extends Comparable<T> {
 
     UUID getGuid();
 
@@ -31,5 +31,10 @@ public interface Node<T extends Node> {
                 .stream()
                 .filter(cacheNode -> !cacheNode.isVisited())
                 .findFirst();
+    }
+
+    @Override
+    default int compareTo(T o) {
+        return getGuid().compareTo(o.getGuid());
     }
 }

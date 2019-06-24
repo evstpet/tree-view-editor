@@ -4,8 +4,9 @@ import com.pes.treeview.core.domain.CacheNode;
 import com.pes.treeview.core.domain.Node;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import static com.pes.treeview.core.domain.Nodes.newCacheNodeFromExisted;
@@ -14,10 +15,10 @@ import static java.util.stream.Collectors.toList;
 @Component
 public class CacheTreeStorage {
 
-    private List<CacheNode> cache;
+    private Set<CacheNode> cache;
 
     public CacheTreeStorage() {
-        this.cache = new ArrayList<>();
+        this.cache = new TreeSet<>();
     }
 
     public void importToChache(Node externalNode, CacheNode parent, List<CacheNode> childs) {
@@ -53,10 +54,10 @@ public class CacheTreeStorage {
     }
 
     public void reset() {
-        cache = new ArrayList<>();
+        cache = new TreeSet<>();
     }
 
-    public List<CacheNode> getCache() {
+    public Set<CacheNode> getCache() {
         return cache;
     }
 }
