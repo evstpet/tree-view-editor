@@ -7,7 +7,7 @@ public interface Node<T extends Node> {
 
     UUID getGuid();
 
-    Node getParent();
+    T getParent();
 
     void addChild(T node);
 

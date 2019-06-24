@@ -5,6 +5,7 @@ import com.pes.treeview.core.domain.Node;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.function.Function;
 
 import static com.pes.treeview.core.domain.Nodes.newCacheNodeFromExternal;
 import static java.util.stream.Collectors.toList;
@@ -13,36 +14,31 @@ import static java.util.stream.Collectors.toList;
 public class CacheTreeStorage {
 
     private List<CacheNode> cache;
-    private Map<UUID, Node> externalLinksCache;
+    private Map<UUID, Node> cachedExternalNodes;
     private List<CacheNode> visitedNodes = new ArrayList<>();
 
     public CacheTreeStorage() {
         this.cache = new ArrayList<>();
-        this.externalLinksCache = new HashMap<>();
+        this.cachedExternalNodes = new HashMap<>();
     }
 
     public void addNewToCache(CacheNode node, String value) {
         node.addChild(new CacheNode(value, node, null));
     }
 
-    public void remove(Node node) {
-        Optional<CacheNode> found = cache.stream()
+    public void disableLeaf(Node node) {
+        cache.stream()
                 .map(cacheNode -> findNodeInTreeByGuid(cacheNode, node.getGuid()))
                 .filter(Objects::nonNull)
-                .findAny();
-
-        if (found.isPresent()) {
-            CacheNode foundNode = found.get();
-            foundNode.setEnable(false);
-        }
-        cleanVisited();
+                .findFirst()
+                .ifPresent(foundNode -> foundNode.setEnable(false));
     }
 
     public void importToChache(Node externalNode) {
-        if (externalLinksCache.get(externalNode.getGuid()) != null) {
+        if (cachedExternalNodes.get(externalNode.getGuid()) != null) {
             return;
         }
-        externalLinksCache.put(externalNode.getGuid(), externalNode);
+        cachedExternalNodes.put(externalNode.getGuid(), externalNode);
 
         CacheNode parentNode = findNodeInCacheTrees(externalNode.getParent()).orElse(null);
         List<CacheNode> childs = getChildsFromCache(externalNode);
@@ -63,8 +59,8 @@ public class CacheTreeStorage {
         }
     }
 
-    private boolean removeChildsFromCache(Node externalNode) {
-        return cache.removeIf(cacheNode -> findChildsGuids(externalNode).contains(cacheNode.getGuid()));
+    private void removeChildsFromCache(Node externalNode) {
+        cache.removeIf(cacheNode -> findChildsGuids(externalNode).contains(cacheNode.getGuid()));
     }
 
     private List<CacheNode> getChildsFromCache(Node externalNode) {
@@ -91,6 +87,17 @@ public class CacheTreeStorage {
     }
 
     private CacheNode findNodeInTreeByGuid(CacheNode tree, UUID parentGuid) {
+        return traverseCacheNodeTree(tree, currentNode -> {
+                if (parentGuid.equals(currentNode.getGuid())) {
+                    return currentNode;
+                }
+                return null;
+        });
+    }
+
+    public CacheNode traverseCacheNodeTree(CacheNode tree, Function<CacheNode, CacheNode> action) {
+        CacheNode result = null;
+
         Deque<CacheNode> stack = new LinkedList<>();
         while (tree != null || !stack.isEmpty()) {
 
@@ -106,10 +113,13 @@ public class CacheTreeStorage {
                     continue;
                 }
 
-                if (parentGuid.equals(tree.getGuid())) {
+                result = action.apply(tree);
+
+                if (result != null) {
                     cleanVisited();
-                    return tree;
+                    return result;
                 }
+
                 tree.setVisited(true);
                 visitedNodes.add(tree);
                 tree = null;
@@ -117,7 +127,7 @@ public class CacheTreeStorage {
         }
 
         cleanVisited();
-        return null;
+        return result;
     }
 
     private void cleanVisited() {
@@ -127,14 +137,14 @@ public class CacheTreeStorage {
 
     public void reset() {
         cache = new ArrayList<>();
-        externalLinksCache = new HashMap<>();
+        cachedExternalNodes = new HashMap<>();
     }
 
     public List<CacheNode> getCache() {
         return cache;
     }
 
-    public Map<UUID, Node> getExternalLinksCache() {
-        return externalLinksCache;
+    public Map<UUID, Node> getCachedExternalNodes() {
+        return cachedExternalNodes;
     }
 }

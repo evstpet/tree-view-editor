@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.function.Function;
 
 import static java.util.Collections.singletonList;
 
@@ -20,8 +21,6 @@ public class TreeViewFacade {
 
     private final CacheTreeStorage cacheTreeStorage;
     private final DBTreeStorage dbTreeStorage;
-
-    private List<CacheNode> visitedNodes = new ArrayList<>();
 
     public List<Node> getCacheTree(){
         return new ArrayList<>(cacheTreeStorage.getCache());
@@ -49,88 +48,59 @@ public class TreeViewFacade {
 
     public void remove(Node node) {
         log.info("Mark as removed: " + node.getValue());
-        cacheTreeStorage.remove(node);
+        cacheTreeStorage.disableLeaf(node);
     }
 
     public void exportCacheToDb() {
         log.info("Push cache to db!");
-        List<CacheNode> cachedNodes = cacheTreeStorage.getCache();
-        cachedNodes.forEach(this::traverseCachedTree);
-        cleanVisited();
+        List<CacheNode> cache = cacheTreeStorage.getCache();
+        cache.forEach(tree -> cacheTreeStorage.traverseCacheNodeTree(tree, exportCacheNodeToDb()));
     }
 
-    private void traverseCachedTree(CacheNode tree) {
+    private Function<CacheNode, CacheNode> exportCacheNodeToDb() {
+        return node -> {
 
-        if (!tree.isEnable()) {
-            System.out.println("===Disable node & childs for: " + tree.getValue() + "===");
-        }
-
-        Deque<CacheNode> stack = new LinkedList<>();
-        while (tree != null || !stack.isEmpty()) {
-
-            if (!stack.isEmpty()) {
-                tree = stack.pop();
+            if (!node.isEnable() && node.isCopied()) {
+                Node disabledNode = cacheTreeStorage.getCachedExternalNodes().get(node.getGuid());
+                disabledNode.setEnable(false);
             }
 
-            while (tree != null) {
-                Optional<CacheNode> child = tree.findNotVisitedChild();
-                if (child.isPresent()) {
-                    stack.push(tree);
-                    tree = child.get();
-                    if (tree.isEnable()) {
-                        continue;
-                    }
-                }
-
-                tree.setVisited(true);
-
-                if (!tree.isEnable() && tree.isCopied()) {
-                    Node disabledNode = cacheTreeStorage.getExternalLinksCache().get(tree.getGuid());
-                    disabledNode.setEnable(false);
-                }
-                if (tree.isEnable() && !tree.isCopied()) {
-                    Node newNodeParent = createParentRecursively(tree.getParent());
-                    DbNode newNode = new DbNode(tree.getValue(), (DbNode) newNodeParent, tree.getGuid());
-                    newNodeParent.addChild(newNode);
-                    cacheTreeStorage.getExternalLinksCache().putIfAbsent(newNode.getGuid(), newNode);
-                    tree.setCopied(true);
-                    tree.setChanged(false);
-                }
-                if (tree.isEnable() && tree.isChanged()) {
-                    Node changedNode = cacheTreeStorage.getExternalLinksCache().get(tree.getGuid());
-                    changedNode.setValue(tree.getValue());
-                    tree.setChanged(false);
-                }
-
-                visitedNodes.add(tree);
-
-                tree = null;
+            if (node.isEnable() && !node.isCopied()) {
+                DbNode newNodeParent = createDbParentRecursively(node.getParent());
+                DbNode newNode = new DbNode(node.getValue(), newNodeParent, node.getGuid());
+                newNodeParent.addChild(newNode);
+                cacheTreeStorage.getCachedExternalNodes().putIfAbsent(newNode.getGuid(), newNode);
+                node.setCopied(true);
+                node.setChanged(false);
             }
-        }
+
+            if (node.isEnable() && node.isChanged()) {
+                Node changedNode = cacheTreeStorage.getCachedExternalNodes().get(node.getGuid());
+                changedNode.setValue(node.getValue());
+                node.setChanged(false);
+            }
+
+            return null;
+        };
     }
 
-    private Node createParentRecursively(CacheNode treeParent) {
-        Node newNodeParent = cacheTreeStorage.getExternalLinksCache().get(treeParent.getGuid());
+    private DbNode createDbParentRecursively(CacheNode treeParent) {
+        DbNode newNodeParent = (DbNode) cacheTreeStorage.getCachedExternalNodes().get(treeParent.getGuid());
 
         if (newNodeParent != null) {
             return newNodeParent;
         }
 
-        newNodeParent = createParentRecursively(treeParent.getParent());
+        newNodeParent = createDbParentRecursively(treeParent.getParent());
 
 
-        DbNode newNode = new DbNode(treeParent.getValue(), (DbNode) newNodeParent, treeParent.getGuid());
+        DbNode newNode = new DbNode(treeParent.getValue(), newNodeParent, treeParent.getGuid());
         newNodeParent.addChild(newNode);
-        cacheTreeStorage.getExternalLinksCache().putIfAbsent(newNode.getGuid(), newNode);
+        cacheTreeStorage.getCachedExternalNodes().putIfAbsent(newNode.getGuid(), newNode);
         treeParent.setCopied(true);
         treeParent.setChanged(false);
 
         return newNode;
-    }
-
-    private void cleanVisited() {
-        visitedNodes.forEach(node -> node.setVisited(false));
-        visitedNodes = new ArrayList<>();
     }
 
 }
