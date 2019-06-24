@@ -16,13 +16,8 @@ public class CacheNode implements Node<CacheNode> {
     private boolean changed;
     private boolean copied;
 
-    public CacheNode(String value, CacheNode parent, UUID originalGuid) {
-        if (originalGuid != null) {
-            copied = true;
-            guid = originalGuid;
-        } else {
-            guid = UUID.randomUUID();
-        }
+    CacheNode(String value, CacheNode parent, UUID originalGuid) {
+        guid = originalGuid;
         childs = new ArrayList<>();
         this.value = value;
         this.parent = parent;

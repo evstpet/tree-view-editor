@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.function.Function;
 
+import static com.pes.treeview.core.domain.Nodes.newCacheNode;
+import static com.pes.treeview.core.domain.Nodes.newDbNodeFromExisted;
 import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
@@ -21,8 +23,6 @@ public class TreeViewFacade {
 
     private final CacheTreeStorage cacheTreeStorage;
     private final DBTreeStorage dbTreeStorage;
-
-    private List<Node> visitedNodes = new ArrayList<>();
 
     public List<Node> getCacheTree() {
         return new ArrayList<>(cacheTreeStorage.getCache());
@@ -39,26 +39,31 @@ public class TreeViewFacade {
 
     public void importToChache(Node externalNode) {
         log.info("Import to cache: " + externalNode.getValue());
-        if (!cacheTreeStorage.findNodeInCacheTrees(externalNode).isPresent()) {
-            cacheTreeStorage.importToChache(externalNode);
+        if (externalNode.isEnable() && !findCacheNode(externalNode).isPresent()) {
+            Optional<CacheNode> parent = externalNode.getParent() != null ?
+                    findCacheNode(externalNode.getParent()) :
+                    Optional.empty();
+            List<CacheNode> childs = cacheTreeStorage.getChildsFromCache(externalNode);
+
+            cacheTreeStorage.importToChache(externalNode, parent.orElse(null), childs);
+
+            cacheTreeStorage.removeChildsFromCache(externalNode);
         }
     }
 
     public void addNewToCache(Node node, String value) {
         log.info("Import to cache: " + value);
-        cacheTreeStorage.findNodeInCacheTrees(node)
-                .ifPresent(cacheNode -> cacheTreeStorage.addNewToCache(cacheNode, value));
+        findCacheNode(node).ifPresent(cacheNode -> cacheNode.addChild(newCacheNode(value, cacheNode)));
     }
 
     public void disableInCache(Node node) {
         log.info("Mark as removed: " + node.getValue());
-        cacheTreeStorage.disableLeaf(node);
+        findCacheNode(node).ifPresent(foundNode -> foundNode.setEnable(false));
     }
 
     public void exportCacheToDb() {
         log.info("Push cache to db!");
-        List<CacheNode> cache = cacheTreeStorage.getCache();
-        cache.forEach(tree -> cacheTreeStorage.traverseCacheNodeTree(tree, exportCacheNodeToDb()));
+        cacheTreeStorage.getCache().forEach(tree -> traverseTree(tree, exportCacheNodeToDb()));
     }
 
     private Function<CacheNode, CacheNode> exportCacheNodeToDb() {
@@ -87,15 +92,37 @@ public class TreeViewFacade {
     }
 
     private void addNewDbNode(CacheNode node) {
-        DbNode newNodeParent = createDbParentRecursively(node.getParent());
-        DbNode newNode = new DbNode(node.getValue(), newNodeParent, node.getGuid());
-        newNodeParent.addChild(newNode);
-        node.setCopied(true);
-        node.setChanged(false);
+        if (isPermittedToAddNewDbNode(node)) {
+            DbNode newNodeParent = createDbParentRecursively(node.getParent());
+            DbNode newNode = newDbNodeFromExisted(node.getValue(), newNodeParent, node.getGuid());
+            newNodeParent.addChild(newNode);
+            node.setCopied(true);
+            node.setChanged(false);
+        }
+    }
+
+    private boolean isPermittedToAddNewDbNode(CacheNode node) {
+        CacheNode parent = node.getParent();
+
+        while (parent != null) {
+            DbNode dbNode = findDbNode(parent).orElse(null);
+
+            if (dbNode == null) {
+                parent = parent.getParent();
+                continue;
+            }
+
+            if (!dbNode.isEnable()) {
+                log.warn("Can't export: " + node.getValue() + ", because ancestor in db: " + dbNode.getValue() + " is disabled");
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private void changeValueForDbNode(CacheNode node) {
-        findDbNode(node).ifPresent(dbNode -> dbNode.setValue(node.getValue()));
+        findDbNode(node).filter(DbNode::isEnable).ifPresent(dbNode -> dbNode.setValue(node.getValue()));
         node.setChanged(false);
     }
 
@@ -108,7 +135,7 @@ public class TreeViewFacade {
 
         DbNode parent = createDbParentRecursively(treeParent.getParent());
 
-        DbNode newNode = new DbNode(treeParent.getValue(), parent, treeParent.getGuid());
+        DbNode newNode = newDbNodeFromExisted(treeParent.getValue(), parent, treeParent.getGuid());
         parent.addChild(newNode);
         treeParent.setCopied(true);
         treeParent.setChanged(false);
@@ -116,17 +143,30 @@ public class TreeViewFacade {
     }
 
     private Optional<DbNode> findDbNode(Node node) {
-        return Optional.ofNullable(traverseTree(dbTreeStorage.getTree(),
-                     currentNode -> {
-                         if (Objects.equals(currentNode.getGuid(), node.getGuid())) {
-                             return currentNode;
-                         }
-                         return null;
-                     }));
+        return findNodeByGuid(dbTreeStorage.getTree(), node.getGuid());
+    }
+
+    private Optional<CacheNode> findCacheNode(Node node) {
+        return cacheTreeStorage.getCache().stream()
+                .map(cacheNode -> findNodeByGuid(cacheNode, node.getGuid()))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+    }
+
+    private <T extends Node<T>> Optional<T> findNodeByGuid(T tree, UUID guid) {
+        return Optional.ofNullable(traverseTree(tree,
+                                                currentNode -> {
+                                                    if (Objects.equals(currentNode.getGuid(), guid)) {
+                                                        return currentNode;
+                                                    }
+                                                    return null;
+                                                }));
     }
 
     private <T extends Node<T>> T traverseTree(T tree, Function<T, T> action) {
         T result = null;
+        List<T> visitedNodes = new ArrayList<>();
 
         Deque<T> stack = new LinkedList<>();
         while (tree != null || !stack.isEmpty()) {
@@ -146,7 +186,7 @@ public class TreeViewFacade {
                 result = action.apply(tree);
 
                 if (result != null) {
-                    cleanVisited();
+                    visitedNodes.forEach(node -> node.setVisited(false));
                     return result;
                 }
 
@@ -156,12 +196,8 @@ public class TreeViewFacade {
             }
         }
 
-        cleanVisited();
-        return result;
-    }
 
-    private void cleanVisited() {
         visitedNodes.forEach(node -> node.setVisited(false));
-        visitedNodes = new ArrayList<>();
+        return result;
     }
 }

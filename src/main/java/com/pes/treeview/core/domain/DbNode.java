@@ -16,7 +16,7 @@ public class DbNode implements Node<DbNode> {
     private boolean enable;
     private boolean visited;
 
-    public DbNode(String value, DbNode parent, UUID guid) {
+    DbNode(String value, DbNode parent, UUID guid) {
         this.guid = guid;
         childs = new ArrayList<>();
         this.value = value;
