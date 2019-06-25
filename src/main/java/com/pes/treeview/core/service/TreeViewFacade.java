@@ -64,6 +64,8 @@ public class TreeViewFacade {
     public void exportCacheToDb() {
         log.info("Push cache to db!");
         cacheTreeStorage.getCache().forEach(tree -> traverseTree(tree, exportCacheNodeToDb()));
+        log.info("Refresh cache from db!");
+        cacheTreeStorage.getCache().forEach(tree -> traverseTree(tree, refreshCacheNodeFromDb()));
     }
 
     private Function<CacheNode, CacheNode> exportCacheNodeToDb() {
@@ -85,7 +87,16 @@ public class TreeViewFacade {
         };
     }
 
+    private Function<CacheNode, CacheNode> refreshCacheNodeFromDb() {
+        return node -> {
+            findDbNode(node).ifPresent(dbNode -> {
+                node.setValue(dbNode.getValue());
+                node.setEnable(dbNode.isEnable());
+            });
 
+            return null;
+        };
+    }
 
     private void disableDbNode(Node node) {
         findDbNode(node).ifPresent(dbNode -> dbNode.setEnable(false));
